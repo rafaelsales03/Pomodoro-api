@@ -17,6 +17,8 @@ routes.get('/', (request, response) => {
 
 routes.get('/habits', habitsController.index);
 
+routes.get('/habits/:id/metrics', habitsController.metrics);
+
 routes.post('/habits', habitsController.store);
 
 routes.delete('/habits/:id', habitsController.remove);
@@ -24,3 +26,7 @@ routes.delete('/habits/:id', habitsController.remove);
 routes.patch('/habits/:id/toggle', habitsController.toggle);
 
 routes.post('/focus-time', focusTimeController.store);
+
+routes.get('/focus-time', focusTimeController.index);
+
+routes.get('/focus-time/metrics', focusTimeController.metricsByMonth);

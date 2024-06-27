@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import { type Request, type Response } from 'express';
 import { z } from 'zod';
 
-import { FocusTimeModel } from '../models/focus-time.model';
+import { focusTimeModel } from '../models/focus-time.model';
 import { buildValidationErrorMessage } from '../utils/build-validation-error-message.util';
 
 export class FocusTimeController {
@@ -31,11 +31,89 @@ export class FocusTimeController {
         .json({ message: 'TimeTo cannot be in the past' });
     }
 
-    const createFocusTime = await FocusTimeModel.create({
+    const createFocusTime = await focusTimeModel.create({
       timeFrom: timeFrom.toDate(),
       timeTo: timeTo.toDate(),
     });
 
     return response.status(201).json(createFocusTime);
+  };
+
+  index = async (request: Request, response: Response) => {
+    const schema = z.object({
+      date: z.coerce.date(),
+    });
+
+    const validated = schema.safeParse(request.query);
+
+    if (!validated.success) {
+      const errors = buildValidationErrorMessage(validated.error.issues);
+
+      return response.status(422).json({ message: errors });
+    }
+
+    const startDate = dayjs(validated.data.date).startOf('day');
+    const endDate = dayjs(validated.data.date).endOf('day');
+
+    const focusTimes = await focusTimeModel
+      .find({
+        timeFrom: {
+          $gte: startDate.toDate(),
+          $lte: endDate.toDate(),
+        },
+      })
+      .sort({
+        timeFrom: 1,
+      });
+
+    return response.status(200).json(focusTimes);
+  };
+
+  metricsByMonth = async (request: Request, response: Response) => {
+    const schema = z.object({
+      date: z.coerce.date(),
+    });
+
+    const validated = schema.safeParse(request.query);
+
+    if (!validated.success) {
+      const errors = buildValidationErrorMessage(validated.error.issues);
+
+      return response.status(422).json({ message: errors });
+    }
+
+    const startDate = dayjs(validated.data.date).startOf('month');
+    const endDate = dayjs(validated.data.date).endOf('month');
+
+    const focusTimesMetrics = await focusTimeModel
+      .aggregate()
+      .match({
+        timeFrom: {
+          $gte: startDate.toDate(),
+          $lte: endDate.toDate(),
+        },
+      })
+      .project({
+        year: {
+          $year: '$timeFrom',
+        },
+        month: {
+          $month: '$timeFrom',
+        },
+        day: {
+          $dayOfMonth: '$timeFrom',
+        },
+      })
+      .group({
+        _id: ['$year', '$month', '$day'],
+        count: {
+          $sum: 1,
+        },
+      })
+      .sort({
+        _id: 1,
+      });
+
+    return response.status(200).json(focusTimesMetrics);
   };
 }

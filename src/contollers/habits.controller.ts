@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import { type Request, type Response } from 'express';
+import mongoose from 'mongoose';
 import { z } from 'zod';
 
 import { habitModel } from '../models/habit.model';
@@ -89,6 +90,7 @@ export class HabitsController {
     if (!findHabit) {
       return response.status(404).json({ message: 'Habit not found.' });
     }
+
     const now = dayjs().startOf('day').toISOString();
 
     const isHabitCompletedOneDate = findHabit
@@ -129,5 +131,55 @@ export class HabitsController {
     );
 
     return response.status(200).json(habitUpdated);
+  };
+
+  metrics = async (request: Request, response: Response) => {
+    const schema = z.object({
+      id: z.string(),
+      date: z.coerce.date(),
+    });
+
+    const validated = schema.safeParse({ ...request.params, ...request.query });
+
+    if (!validated.success) {
+      const errors = buildValidationErrorMessage(validated.error.issues);
+
+      return response.status(422).json({ message: errors });
+    }
+
+    const dateFrom = dayjs(validated.data.date).startOf('month');
+    const dateTo = dayjs(validated.data.date).endOf('month');
+
+    const [habitMetrics] = await habitModel
+      .aggregate()
+      .match({
+        _id: new mongoose.Types.ObjectId(validated.data.id),
+      })
+      .project({
+        _id: 1,
+        name: 1,
+        completedDates: {
+          $filter: {
+            input: '$completedDates',
+            as: 'completedDate',
+            cond: {
+              $and: [
+                {
+                  $gte: ['$$completedDate', dateFrom.toDate()],
+                },
+                {
+                  $lte: ['$$completedDate', dateTo.toDate()],
+                },
+              ],
+            },
+          },
+        },
+      });
+
+    if (!habitMetrics) {
+      return response.status(404).json({ message: 'Habit not found.' });
+    }
+
+    return response.status(200).json(habitMetrics);
   };
 }
