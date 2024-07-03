@@ -4,6 +4,7 @@ import packageJson from '../package.json';
 import { AuthController } from './contollers/auth.controller';
 import { FocusTimeController } from './contollers/focus-time.controller';
 import { HabitsController } from './contollers/habits.controller';
+import { authMiddleware } from './middlewares/auth.middleware';
 
 export const routes = Router();
 
@@ -20,6 +21,8 @@ routes.get('/', (request, response) => {
 routes.get('/auth', authController.auth);
 
 routes.get('/auth/callback', authController.authCallback);
+
+routes.use(authMiddleware);
 
 routes.get('/habits', habitsController.index);
 
